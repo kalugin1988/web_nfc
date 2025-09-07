@@ -5,7 +5,7 @@ services:
     image: kalugin66/web_nfc
     container_name: web_nfc
     ports:
-      - "8083:8080"
+      - "3000:3000"
     restart: always
     environment:
       - TZ=Asia/Yekaterinburg
