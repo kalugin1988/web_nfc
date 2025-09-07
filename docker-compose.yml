@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  web_nfc:
+    build: .
+    image: kalugin66/web_nfc
+    container_name: web_nfc
+    ports:
+      - "8083:8080"
+    restart: always
+    environment:
+      - TZ=Asia/Yekaterinburg
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+#docker-compose up -d --build
