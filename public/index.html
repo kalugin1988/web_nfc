@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SKUD Школа №25</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 20px auto; padding: 10px; }
+    h1 { text-align: center; }
+    .block { margin: 15px 0; }
+    label { display: block; margin: 5px 0; }
+    input, select, button { padding: 6px; font-size: 16px; margin: 5px 0; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .hidden { display: none; }
+    .out { font-family: monospace; padding: 8px; background: #f5f5f5; border-radius: 6px; }
+    button { cursor: pointer; border-radius: 6px; border: 1px solid #aaa; background: #eee; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h1>SKUD Школа №25</h1>
+
+  <div class="block">
+    <button id="scanBtn">Считать NFC</button>
+  </div>
+
+  <div class="block">
+    <div>UID (hex): <span id="hex" class="out">—</span></div>
+    <div>UID (decimal LE): <span id="dec" class="out">—</span></div>
+  </div>
+
+  <div class="block">
+    <label>Фамилия <input id="lastname" type="text"></label>
+    <label>Имя <input id="firstname" type="text"></label>
+    <label>Отчество <input id="middlename" type="text"></label>
+  </div>
+
+  <div class="block">
+    <label><input type="radio" name="type" value="staff"> Сотрудник</label>
+    <label><input type="radio" name="type" value="student"> Ученик</label>
+  </div>
+
+  <div id="staffFields" class="block hidden">
+    <label>Должность <input id="position" type="text"></label>
+  </div>
+
+  <div id="studentFields" class="block hidden">
+    <label>Класс 
+      <select id="grade"></select>
+      <select id="letter"></select>
+    </label>
+  </div>
+
+  <div class="block row">
+    <button id="addBtn" disabled>Добавить в базу</button>
+    <button id="delBtn" disabled>Удалить из базы</button>
+  </div>
+
+  <script>
+    let currentUID = null;
+
+    function cleanHex(str) {
+      return (str || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
+    }
+    function hexToDecimalLE(hex) {
+      const clean = cleanHex(hex);
+      if (!clean || clean.length % 2 !== 0) return null;
+      const bytes = [];
+      for (let i = 0; i < clean.length; i += 2) {
+        bytes.push(parseInt(clean.slice(i, i+2), 16));
+      }
+      bytes.reverse();
+      let val = 0n;
+      for (const b of bytes) val = (val << 8n) + BigInt(b);
+      return val.toString();
+    }
+
+    // динамически заполняем список классов
+    const gradeSel = document.getElementById("grade");
+    for (let i = 1; i <= 12; i++) {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = i;
+      gradeSel.appendChild(opt);
+    }
+
+    // динамически заполняем список букв
+    const letterSel = document.getElementById("letter");
+    const letters = "АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЫЭЮЯ";
+    for (const c of letters) {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      letterSel.appendChild(opt);
+    }
+
+    // выбор типа
+    document.getElementsByName("type").forEach(r => {
+      r.addEventListener("change", () => {
+        document.getElementById("staffFields").classList.add("hidden");
+        document.getElementById("studentFields").classList.add("hidden");
+        if (r.checked && r.value === "staff") document.getElementById("staffFields").classList.remove("hidden");
+        if (r.checked && r.value === "student") document.getElementById("studentFields").classList.remove("hidden");
+      });
+    });
+
+    async function scanNFC() {
+      if (!("NDEFReader" in window)) { alert("Web NFC не поддерживается"); return; }
+      try {
+        const ndef = new NDEFReader();
+        await ndef.scan();
+        ndef.onreading = e => {
+          const serial = e.serialNumber || "";
+          currentUID = hexToDecimalLE(serial);
+          document.getElementById("hex").textContent = serial.toUpperCase();
+          document.getElementById("dec").textContent = currentUID || "ошибка";
+          document.getElementById("addBtn").disabled = !currentUID;
+          document.getElementById("delBtn").disabled = !currentUID;
+        };
+      } catch (err) { alert(err.message); }
+    }
+
+    async function send(action) {
+      if (!currentUID) { alert("Сначала отсканируйте карту"); return; }
+      const data = {
+        uid: currentUID,
+        lastname: document.getElementById("lastname").value,
+        firstname: document.getElementById("firstname").value,
+        middlename: document.getElementById("middlename").value,
+        type: document.querySelector("input[name=type]:checked")?.value || "",
+        position: document.getElementById("position").value,
+        grade: document.getElementById("grade").value,
+        letter: document.getElementById("letter").value
+      };
+      const resp = await fetch("/api/" + action, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(data)
+      });
+      const r = await resp.json();
+      alert(r.status === "ok" ? "Успешно" : "Ошибка");
+    }
+
+    document.getElementById("scanBtn").addEventListener("click", scanNFC);
+    document.getElementById("addBtn").addEventListener("click", ()=>send("add"));
+    document.getElementById("delBtn").addEventListener("click", ()=>send("delete"));
+  </script>
+</body>
+</html>

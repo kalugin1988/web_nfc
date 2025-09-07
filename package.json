@@ -1,0 +1,13 @@
+{
+  "name": "nfc-site",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "basic-auth": "^2.0.1",
+    "body-parser": "^1.20.2"
+  }
+}
